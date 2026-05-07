@@ -20,13 +20,15 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 60m
           script: |
-            # 1. Setup Project Directory
+            # 1. Setup Project Directory (Force sync with GitHub)
             if [ ! -d "rag_lec" ]; then
               git clone https://github.com/${{ github.repository }}.git rag_lec
             fi
             cd rag_lec
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             
             # 2. Inject Secrets into .env
             echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" > .env
@@ -34,17 +36,14 @@ jobs:
             # 3. Start Qdrant first (creates the network)
             docker compose up -d qdrant
             
-            # 4. Wait for Qdrant to be ready and Run Initialization
-            # This ensures the collection and indexes are created automatically
+            # 4. Build the API container first so we don't have to download dependencies twice
+            docker compose build api
+            
+            # 5. Wait for Qdrant to be ready and Run Initialization using the built image
             echo "Waiting for Qdrant to initialize..."
             sleep 10
-            docker run --rm \
-              -v $(pwd):/app \
-              -w /app \
-              --network rag_lec_default \
-              python:3.11-slim \
-              bash -c "pip install qdrant-client fastembed && QDRANT_HOST=qdrant python qdrant_initializer.py"
+            docker compose run --rm api python qdrant_initializer.py
             
-            # 5. Start the API with production rebuild
-            docker compose up -d --build api
+            # 6. Start the API
+            docker compose up -d api
 
