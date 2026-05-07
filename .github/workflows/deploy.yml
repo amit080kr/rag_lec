@@ -19,24 +19,30 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Clone or pull latest code
+            # 1. Setup Project Directory
             if [ ! -d "rag_lec" ]; then
               git clone https://github.com/${{ github.repository }}.git rag_lec
             fi
             cd rag_lec
             git pull origin main
             
-            # Use GitHub Secrets to securely generate the .env file directly on the EC2 server.
+            # 2. Inject Secrets into .env
             echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" > .env
             
-            # 1. Start the Qdrant database first
+            # 3. Start Qdrant first (creates the network)
             docker compose up -d qdrant
             
-            # 2. Automatically initialize the collection (only runs if not already setup)
-            # We wait 15 seconds for Qdrant to boot up
-            sleep 15
-            docker run --rm -v $(pwd):/app -w /app --network rag_lec_default python:3.11-slim bash -c "pip install qdrant-client fastembed && QDRANT_HOST=qdrant python qdrant_initializer.py"
+            # 4. Wait for Qdrant to be ready and Run Initialization
+            # This ensures the collection and indexes are created automatically
+            echo "Waiting for Qdrant to initialize..."
+            sleep 10
+            docker run --rm \
+              -v $(pwd):/app \
+              -w /app \
+              --network rag_lec_default \
+              python:3.11-slim \
+              bash -c "pip install qdrant-client fastembed && QDRANT_HOST=qdrant python qdrant_initializer.py"
             
-            # 3. Rebuild and start the FastAPI application
+            # 5. Start the API with production rebuild
             docker compose up -d --build api
 
