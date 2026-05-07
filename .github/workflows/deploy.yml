@@ -27,11 +27,16 @@ jobs:
             git pull origin main
             
             # Use GitHub Secrets to securely generate the .env file directly on the EC2 server.
-            # This ensures no API keys are ever hardcoded in the repository.
             echo "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" > .env
             
-            # Start the Qdrant database first
+            # 1. Start the Qdrant database first
             docker compose up -d qdrant
             
-            # Rebuild and start the FastAPI application pulling the secure .env automatically
+            # 2. Automatically initialize the collection (only runs if not already setup)
+            # We wait 15 seconds for Qdrant to boot up
+            sleep 15
+            docker run --rm -v $(pwd):/app -w /app --network rag_lec_default python:3.11-slim bash -c "pip install qdrant-client fastembed && QDRANT_HOST=qdrant python qdrant_initializer.py"
+            
+            # 3. Rebuild and start the FastAPI application
             docker compose up -d --build api
+

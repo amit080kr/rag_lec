@@ -2,7 +2,7 @@
 
 A high-performance, production-ready Retrieval-Augmented Generation (RAG) system built with **FastAPI**, **Qdrant**, and **Hybrid Search** (Dense Vector + Sparse BM25). This pipeline is optimized for local CPU-bound performance and efficient deployment on AWS EC2.
 
-## 🚀 Key Features
+## Key Features
 
 - **Incremental Ingestion**: Uses SHA-256 hashing and SQLite to track file changes, ensuring only new or modified documents (PDF/CSV) are processed.
 - **Hybrid Retrieval Engine**:
@@ -16,7 +16,7 @@ A high-performance, production-ready Retrieval-Augmented Generation (RAG) system
 - **Evaluation Suite**: Automated "Golden Dataset" generation via LLM and a metrics engine calculating **Recall@K**, **MRR**, and **Latency**.
 - **Dockerized Deployment**: Multi-worker FastAPI setup optimized for 4-core EC2 instances with hard resource limits.
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Vector Database**: [Qdrant](https://qdrant.tech/)
 - **API Framework**: [FastAPI](https://fastapi.tiangolo.com/)
@@ -25,7 +25,7 @@ A high-performance, production-ready Retrieval-Augmented Generation (RAG) system
 - **Document Processing**: PyMuPDF (PDF), Pandas (CSV), LangChain (Text Splitters)
 - **Logging**: Structured JSON logging and dedicated OOD audit logs.
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 ├── main.py                 # FastAPI Application (Entry point)
@@ -42,7 +42,7 @@ A high-performance, production-ready Retrieval-Augmented Generation (RAG) system
 └── aws_ec2_deployment_guide.md # Step-by-step AWS setup instructions
 ```
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ### Local Development
 
@@ -82,7 +82,7 @@ A high-performance, production-ready Retrieval-Augmented Generation (RAG) system
 
 ---
 
-## 🐳 Docker Deployment (Automated via GitHub Actions)
+## Docker Deployment (Automated via GitHub Actions)
 
 To prevent hardcoding API keys, this repository uses **GitHub Actions** and **GitHub Secrets** for secure, automated deployment to AWS EC2.
 
@@ -102,7 +102,7 @@ To prevent hardcoding API keys, this repository uses **GitHub Actions** and **Gi
 
 ---
 
-## 📊 API Endpoints
+## API Endpoints
 
 - **`GET /`**: API Status and welcome message.
 - **`POST /ingest`**: Trigger incremental ingestion of a local directory.
@@ -113,7 +113,7 @@ To prevent hardcoding API keys, this repository uses **GitHub Actions** and **Gi
 
 ---
 
-## 🧪 Evaluation
+## Evaluation
 
 1. **Generate Golden Dataset**: Ensure Ollama or Groq is configured in `generate_golden_dataset.py`.
    ```bash
