@@ -185,48 +185,73 @@ async def upload_document(file: UploadFile = File(...)):
 @app.post("/query")
 async def query_documents(request: QueryRequest):
     """
-    2. Executes a Hybrid Search (Dense + Sparse BM25 + RRF) and re-ranks with FlashRank.
-    3. Calls Groq LLM to generate a natural language response using the requested system prompt.
+    2. Executes a Query Standardization LLM call to optimize user input.
+    3. Executes a Hybrid Search (Dense + Sparse BM25 + RRF) with the optimized query.
+    4. Calls Groq LLM to generate a natural language response using the strict answering prompt.
     """
     try:
+        # Step 1: Query Standardization
+        rewrite_prompt = """You are a query standardization engine. Your task is to take a messy, conversational user input and rewrite it into a concise, keyword-rich search query optimized for a vector database.
+
+RULES:
+Remove all conversational filler (e.g., 'Hello, can you tell me...', 'I was wondering if...').
+Fix obvious spelling errors based on technical context.
+Output ONLY the rewritten search query string. Do not include introductory text, quotes, or explanations.
+
+Example:
+User: 'Hey there, I forgot how to set up my VPN on my new macbook, can u help?'
+Output: 'MacBook VPN setup instructions'
+"""
+        rewrite_response = await llm_client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": rewrite_prompt},
+                {"role": "user", "content": request.query}
+            ],
+            temperature=0.0
+        )
+        
+        optimized_query = rewrite_response.choices[0].message.content.strip().strip("'\"")
+        logger.info(f"Original query: '{request.query}' -> Optimized query: '{optimized_query}'")
+
+        # Step 2: Hybrid Search with Optimized Query
         results = retriever.search(
-            query=request.query, 
+            query=optimized_query, 
             hybrid_top_k=request.hybrid_top_k, 
             rerank_top_k=request.rerank_top_k,
             confidence_threshold=request.confidence_threshold
         )
         
-        # Build [CONTEXT] block
+        # Step 3: Build [RETRIEVED_DOCUMENTS] block
         context_block = ""
-        if not results or (len(results) > 0 and results[0].get("id") == "ood-response"):
-            context_block = "[SYSTEM_ERROR]"
-        else:
-            for r in results:
-                context_block += f"{r['payload'].get('content', '')}\n\n"
+        for r in results:
+            context_block += f"{r['payload'].get('content', '')}\n\n"
         
-        system_prompt = f"""You are an enterprise knowledge assistant. You will be provided with a user query and a [CONTEXT] block retrieved from our database.
+        # Step 4: Strict Factual Answer Generation
+        answer_prompt = f"""You are a strict, factual answering agent. Your only goal is to answer the user's query using strictly the information provided in the [RETRIEVED_DOCUMENTS] block.
 
-CRITICAL INSTRUCTION: If the [CONTEXT] block is explicitly labeled as [SYSTEM_ERROR] or is completely empty, you MUST NOT attempt to answer the user's query from your internal knowledge.
-Instead, reply exactly with: 'I am currently experiencing a temporary connection issue with the knowledge database and cannot retrieve the necessary documents. Please try again in a few moments.' Do not mention vector databases, APIs, or system architecture.
+RULES:
+If the provided documents contain the answer, synthesize a clear response.
+If the user's query asks for information not present in the documents (e.g., recipes, off-topic subjects, or missing data), you must reply with: 'Based on the provided company context, I do not have the information to answer this question.'
+Never use the phrases 'Based on my knowledge' or 'I think.'
+Do not attempt to guess or infer data that is not explicitly stated.
 
-[CONTEXT]
+[RETRIEVED_DOCUMENTS]
 {context_block}
 """
 
-        # Call Groq LLM
         response = await llm_client.chat.completions.create(
             model="llama3-8b-8192",
             messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.query}
+                {"role": "system", "content": answer_prompt},
+                {"role": "user", "content": request.query} # Answer the original conversational query
             ],
             temperature=0.0
         )
         
         final_answer = response.choices[0].message.content
         
-        # Return string in results to match what frontend expects
-        return {"query": request.query, "results": final_answer}
+        return {"query": request.query, "optimized_query": optimized_query, "results": final_answer}
     except Exception as e:
         logger.error(f"Query failed: {e}")
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
