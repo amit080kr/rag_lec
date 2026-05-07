@@ -209,8 +209,35 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // If it's an array of chunks (from hybrid_retriever)
-        if (Array.isArray(data)) {
+        // If the backend returns our new structured JSON Analytical Engine format
+        if (data && data.answer !== undefined) {
+            let html = `<p>${formatText(data.answer)}</p>`;
+            
+            // Render confidence score badge
+            if (data.confidence_score !== undefined) {
+                const score = (data.confidence_score * 100).toFixed(0);
+                let colorClass = 'success';
+                if (score < 50) colorClass = 'error';
+                else if (score < 80) colorClass = 'warning';
+                
+                html += `<div style="margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid rgba(255,255,255,0.1); display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">`;
+                html += `<span style="font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid var(--border-color);">Confidence: <strong style="color: var(--${colorClass})">${score}%</strong></span>`;
+                
+                // Render citations if present
+                if (data.citations && Array.isArray(data.citations) && data.citations.length > 0) {
+                    html += `<span style="font-size: 0.75rem; color: var(--text-secondary);">Citations: `;
+                    data.citations.forEach((cit) => {
+                        html += `<span style="background: rgba(59, 130, 246, 0.2); color: var(--accent-primary); padding: 0.1rem 0.4rem; border-radius: 4px; margin-right: 0.4rem; font-family: monospace;">${cit.substring(0,6)}...</span>`;
+                    });
+                    html += `</span>`;
+                }
+                
+                html += `</div>`;
+            }
+            
+            contentDiv.innerHTML = html;
+            
+        } else if (Array.isArray(data)) {
             if (data.length === 0) {
                 contentDiv.innerHTML = "I couldn't find any relevant information in the documents.";
                 return;
@@ -221,9 +248,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += `
                     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1)">
                         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                            📄 ${item.metadata.source || 'Unknown'} (Score: ${item.score.toFixed(3)})
+                            📄 ${item.metadata?.source || 'Unknown'} (Score: ${item.score?.toFixed(3) || 'N/A'})
                         </p>
-                        <p>${formatText(item.text)}</p>
+                        <p>${formatText(item.text || JSON.stringify(item))}</p>
                     </div>
                 `;
             });
