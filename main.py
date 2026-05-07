@@ -1,8 +1,9 @@
 import logging
 from typing import List, Dict, Any
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -82,13 +83,13 @@ class QueryRequest(BaseModel):
 
 # --- Endpoints ---
 
-@app.get("/")
-async def root():
+@app.get("/status")
+async def status():
     """Welcome endpoint for simple browser verification."""
     return {
         "status": "online",
         "message": "RAG Pipeline API is running. Access the API documentation at /docs",
-        "endpoints": ["POST /ingest", "POST /query"]
+        "endpoints": ["POST /ingest", "POST /query", "POST /upload", "GET /status"]
     }
 
 @app.get("/health")
@@ -134,6 +135,44 @@ async def ingest_documents(request: IngestRequest):
         logger.error(f"Ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
 
+import os
+import shutil
+
+@app.post("/upload")
+async def upload_document(file: UploadFile = File(...)):
+    """
+    Saves an uploaded file to the data/ directory and triggers ingestion for that file.
+    """
+    try:
+        # Ensure data directory exists
+        os.makedirs("data", exist_ok=True)
+        
+        file_path = os.path.join("data", file.filename)
+        
+        # Save the file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        logger.info(f"File uploaded successfully: {file_path}")
+        
+        # Trigger ingestion specifically for the data directory
+        manager = DocumentManager(directory="data")
+        files_to_process = manager.get_files_to_process()
+        
+        if file_path in files_to_process:
+            chunks = processor.process_file(file_path)
+            if chunks:
+                vector_engine.upsert_documents(chunks, batch_size=100)
+                return {"message": f"Successfully uploaded and ingested {file.filename}", "chunks": len(chunks)}
+            else:
+                return {"message": f"Uploaded {file.filename} but no text chunks could be extracted."}
+        else:
+            return {"message": f"Uploaded {file.filename} but it was skipped (already ingested or invalid format)."}
+            
+    except Exception as e:
+        logger.error(f"Upload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+
 @app.post("/query")
 async def query_documents(request: QueryRequest):
     """
@@ -151,6 +190,17 @@ async def query_documents(request: QueryRequest):
     except Exception as e:
         logger.error(f"Query failed: {e}")
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
+
+# Mount Static Files (Must be at the bottom so it doesn't override API routes)
+# Ensure the static directory exists to prevent startup errors
+os.makedirs("static", exist_ok=True)
+
+# Define a custom route for the root to serve index.html explicitly
+@app.get("/")
+async def serve_frontend():
+    return FileResponse("static/index.html")
+
+app.mount("/", StaticFiles(directory="static"), name="static")
 
 # 4. Uvicorn multiple workers logic (optimized for 4-core EC2)
 if __name__ == "__main__":

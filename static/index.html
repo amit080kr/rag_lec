@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus | RAG Intelligence</title>
+    <meta name="description" content="AI-Powered Retrieval-Augmented Generation Interface">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="background-effects">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <main class="app-container">
+        <!-- Sidebar / Upload Area -->
+        <aside class="sidebar glass-panel">
+            <div class="brand">
+                <div class="logo-icon">✨</div>
+                <h1>Nexus AI</h1>
+            </div>
+            
+            <div class="upload-section">
+                <h2>Knowledge Base</h2>
+                <p class="subtitle">Upload documents to expand the AI's context.</p>
+                
+                <div id="drop-zone" class="drop-zone">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <span class="drop-text">Drag & drop files or <span class="highlight">browse</span></span>
+                    <input type="file" id="file-input" accept=".pdf,.csv" multiple hidden>
+                </div>
+                
+                <div id="upload-status" class="upload-status hidden">
+                    <div class="loader-bar">
+                        <div class="progress"></div>
+                    </div>
+                    <span class="status-text">Processing documents...</span>
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <div class="stat-card">
+                    <span class="stat-label">Status</span>
+                    <span id="api-status" class="stat-value online">● Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <section class="chat-interface glass-panel">
+            <div class="chat-header">
+                <h2>Neural Interface</h2>
+                <div class="model-badge">Llama-3-8B-8192</div>
+            </div>
+
+            <div id="chat-history" class="chat-history">
+                <div class="message ai-message">
+                    <div class="avatar">✨</div>
+                    <div class="content">
+                        Hello. I am Nexus, your intelligent retrieval assistant. Upload your documents on the left, and ask me anything about them.
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <form id="query-form" class="query-form">
+                    <input type="text" id="query-input" placeholder="Ask a question..." autocomplete="off" required>
+                    <button type="submit" id="send-button" class="send-button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </form>
+                <div class="input-footer">
+                    Powered by Hybrid Search (Dense + BM25) & Groq
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
