@@ -87,7 +87,7 @@ A high-performance, production-ready Retrieval-Augmented Generation (RAG) system
 To prevent hardcoding API keys, this repository uses **GitHub Actions** and **GitHub Secrets** for secure, automated deployment to AWS EC2.
 
 1. **Configure GitHub Secrets**:
-   Go to your repository **Settings > Secrets and variables > Actions** and add:
+   Go to your repository **Settings > Secrets and variables > Actions**. Under the **"Repository secrets"** section (NOT Variables), click **"New repository secret"** and add:
    - `GROQ_API_KEY`: Your Groq API key
    - `EC2_HOST`: The Public IP of your EC2 instance
    - `EC2_USERNAME`: Usually `ubuntu`
