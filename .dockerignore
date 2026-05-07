@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Databases
+*.db
+*.sqlite3
+document_tracking.db
+
+# VS Code
+.vscode/
+
+# Local Data and Logs
+*.pdf
+*.csv
+qdrant_data/
+golden_dataset.json
+*.log
