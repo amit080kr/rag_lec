@@ -17,8 +17,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '3.0' # Reserve ~1 core for Qdrant/OS on a 4-core instance
-          memory: 4G  # Limit RAM to prevent EC2 OOM
+          cpus: '0.5' # Limit to half a core to leave room for Qdrant/OS
+          memory: 512M # Tight limit for 1GB Free Tier instance
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -38,5 +38,5 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 2G
+          cpus: '0.3'
+          memory: 256M

@@ -24,5 +24,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Start Uvicorn with 4 workers to optimize for 4-core EC2
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Start Uvicorn with 1 worker to fit in AWS Free Tier (1GB RAM)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
