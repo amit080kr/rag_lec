@@ -46,21 +46,30 @@ class HybridRetriever:
         
         logger.info("HybridRetriever initialized successfully.")
 
-    def _dense_search(self, query: str, limit: int = 60) -> List[models.ScoredPoint]:
-        """Performs a dense vector search in Qdrant."""
+    def _dense_search(self, query: str, tenant_id: str, allowed_access_levels: List[str], limit: int = 60) -> List[models.ScoredPoint]:
+        """Performs a dense vector search in Qdrant with tenant and RBAC filtering."""
         logger.info("Executing dense vector search...")
         # Embed query text
         query_vector = list(self.embedding_model.embed([query]))[0].tolist()
         
+        # Build the payload filter
+        query_filter = models.Filter(
+            must=[
+                models.FieldCondition(key="tenant_id", match=models.MatchValue(value=tenant_id)),
+                models.FieldCondition(key="access_level", match=models.MatchAny(any=allowed_access_levels))
+            ]
+        )
+        
         results = self.qdrant_client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
+            query_filter=query_filter,
             limit=limit,
             with_payload=True
         )
         return results.points
 
-    def _sparse_bm25_search(self, query: str, limit: int = 60) -> List[Tuple[str, float, dict]]:
+    def _sparse_bm25_search(self, query: str, tenant_id: str, allowed_access_levels: List[str], limit: int = 60) -> List[Tuple[str, float, dict]]:
         """
         Since Qdrant's TextIndexParams provides boolean filtering (MatchText)
         and not BM25 scoring, we fetch matched candidates and rank them locally 
@@ -68,7 +77,7 @@ class HybridRetriever:
         """
         logger.info("Executing sparse full-text search and local BM25 ranking...")
         
-        # 1. Fetch candidate documents that contain the query words
+        # 1. Fetch candidate documents that contain the query words and match the tenant/access filters
         # We use MatchText which leverages the Full-text index we created
         scroll_results, _ = self.qdrant_client.scroll(
             collection_name=self.collection_name,
@@ -77,7 +86,9 @@ class HybridRetriever:
                     models.FieldCondition(
                         key="content",
                         match=models.MatchText(text=query)
-                    )
+                    ),
+                    models.FieldCondition(key="tenant_id", match=models.MatchValue(value=tenant_id)),
+                    models.FieldCondition(key="access_level", match=models.MatchAny(any=allowed_access_levels))
                 ]
             ),
             limit=limit,
@@ -106,6 +117,8 @@ class HybridRetriever:
     def search(
         self, 
         query: str, 
+        tenant_id: str,
+        allowed_access_levels: List[str],
         hybrid_top_k: int = 20, 
         rerank_top_k: int = 5,
         confidence_threshold: float = 0.4
@@ -117,8 +130,8 @@ class HybridRetriever:
         logger.info(f"Initiating Hybrid Search for query: '{query}'")
         
         # Fetch up to 60 candidates from both strategies
-        dense_results = self._dense_search(query, limit=60)
-        sparse_results = self._sparse_bm25_search(query, limit=60)
+        dense_results = self._dense_search(query, tenant_id, allowed_access_levels, limit=60)
+        sparse_results = self._sparse_bm25_search(query, tenant_id, allowed_access_levels, limit=60)
         
         rrf_scores: Dict[str, float] = {}
         payloads: Dict[str, dict] = {}
@@ -194,7 +207,13 @@ if __name__ == "__main__":
     
     # Execute a test query against the mock chunks we upserted previously
     test_query = "test content for chunk 5"
-    results = retriever.search(query=test_query, hybrid_top_k=20, rerank_top_k=5)
+    results = retriever.search(
+        query=test_query, 
+        tenant_id="test_tenant", 
+        allowed_access_levels=["public", "internal"], 
+        hybrid_top_k=20, 
+        rerank_top_k=5
+    )
     
     print(f"\n--- Top Results for '{test_query}' ---")
     for r in results:

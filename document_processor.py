@@ -20,6 +20,8 @@ class ChunkMetadata(BaseModel):
     page_number: Optional[int] = Field(description="Page number (1-indexed) if applicable (e.g., PDF)")
     chunk_index: int = Field(description="Sequential index of the chunk within the document")
     summary_hint: str = Field(description="First 100 characters of the document acting as a summary hint")
+    tenant_id: str = Field(description="Tenant ID this document belongs to")
+    access_level: str = Field(description="Access level (e.g., 'public', 'internal', 'confidential')")
 
 class DocumentChunk(BaseModel):
     text: str = Field(description="The text content of the chunk")
@@ -43,7 +45,7 @@ class DocumentProcessor:
             chunk_overlap=self.chunk_overlap
         )
         
-    def process_file(self, file_path: Union[str, Path]) -> List[DocumentChunk]:
+    def process_file(self, file_path: Union[str, Path], tenant_id: str, access_level: str) -> List[DocumentChunk]:
         """Routes the file to the appropriate processor based on extension."""
         path = Path(file_path)
         if not path.exists():
@@ -52,14 +54,14 @@ class DocumentProcessor:
             
         ext = path.suffix.lower()
         if ext == '.pdf':
-            return self._process_pdf(path)
+            return self._process_pdf(path, tenant_id, access_level)
         elif ext == '.csv':
-            return self._process_csv(path)
+            return self._process_csv(path, tenant_id, access_level)
         else:
             logger.warning(f"Unsupported file type: {ext}. Skipping {path.name}.")
             return []
 
-    def _process_pdf(self, file_path: Path) -> List[DocumentChunk]:
+    def _process_pdf(self, file_path: Path, tenant_id: str, access_level: str) -> List[DocumentChunk]:
         """Extracts text from a PDF, splits it into chunks, and attaches metadata."""
         logger.info(f"Processing PDF: {file_path.name}")
         chunks: List[DocumentChunk] = []
@@ -91,7 +93,9 @@ class DocumentProcessor:
                     source_file=file_path.name,
                     page_number=page_num,
                     chunk_index=global_chunk_idx,
-                    summary_hint=summary_hint
+                    summary_hint=summary_hint,
+                    tenant_id=tenant_id,
+                    access_level=access_level
                 )
                 chunks.append(DocumentChunk(text=chunk_text, metadata=meta))
                 global_chunk_idx += 1
@@ -100,7 +104,7 @@ class DocumentProcessor:
         logger.info(f"Generated {len(chunks)} chunks from {file_path.name}")
         return chunks
 
-    def _process_csv(self, file_path: Path) -> List[DocumentChunk]:
+    def _process_csv(self, file_path: Path, tenant_id: str, access_level: str) -> List[DocumentChunk]:
         """Extracts text from a CSV, formatting rows as 'Key: Value', and splits it."""
         logger.info(f"Processing CSV: {file_path.name}")
         chunks: List[DocumentChunk] = []
@@ -131,7 +135,9 @@ class DocumentProcessor:
                 source_file=file_path.name,
                 page_number=None, # CSVs do not have a traditional page number
                 chunk_index=idx,
-                summary_hint=summary_hint
+                summary_hint=summary_hint,
+                tenant_id=tenant_id,
+                access_level=access_level
             )
             chunks.append(DocumentChunk(text=chunk_text, metadata=meta))
             
@@ -152,7 +158,7 @@ if __name__ == "__main__":
         # 2. Process
         # We use a small chunk_size to demonstrate chunking works on our tiny test file
         processor = DocumentProcessor(chunk_size=10, chunk_overlap=2) 
-        results = processor.process_file(csv_file)
+        results = processor.process_file(csv_file, tenant_id="test_tenant", access_level="public")
         
         print(f"Total chunks created: {len(results)}")
         for chunk in results:

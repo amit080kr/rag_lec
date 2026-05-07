@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict, Any
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Header, Depends, Form
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -84,12 +84,40 @@ async def global_exception_handler(request: Request, exc: Exception):
 # --- API Models ---
 class IngestRequest(BaseModel):
     directory_path: str
+    tenant_id: str
+    access_level: str
     
 class QueryRequest(BaseModel):
     query: str
     hybrid_top_k: int = 20
     rerank_top_k: int = 5
     confidence_threshold: float = 0.4
+
+# --- Security Dependency ---
+class UserPermissions(BaseModel):
+    tenant_id: str
+    allowed_access_levels: List[str]
+
+async def get_current_user(x_user_token: str = Header(..., description="Format: tenantId_accessLevel (e.g. tenantA_internal)")) -> UserPermissions:
+    """Mock identity provider decoding for RBAC demonstration."""
+    try:
+        parts = x_user_token.split("_")
+        if len(parts) != 2:
+            raise ValueError()
+        
+        tenant_id = parts[0]
+        role = parts[1]
+        
+        # Simple hierarchical RBAC mapping
+        access_levels = ["public"]
+        if role == "internal":
+            access_levels.extend(["internal"])
+        elif role == "confidential":
+            access_levels.extend(["internal", "confidential"])
+            
+        return UserPermissions(tenant_id=tenant_id, allowed_access_levels=access_levels)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid X-User-Token format.")
 
 # --- Endpoints ---
 
@@ -128,7 +156,11 @@ async def ingest_documents(request: IngestRequest):
         total_chunks = 0
         for file_path in files_to_process:
             logger.info(f"Ingesting file: {file_path}")
-            chunks = processor.process_file(file_path)
+            chunks = processor.process_file(
+                file_path, 
+                tenant_id=request.tenant_id, 
+                access_level=request.access_level
+            )
             if chunks:
                 vector_engine.upsert_documents(chunks, batch_size=100)
                 total_chunks += len(chunks)
@@ -149,7 +181,11 @@ import os
 import shutil
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...),
+    tenant_id: str = Form(...),
+    access_level: str = Form(...)
+):
     """
     Saves an uploaded file to the data/ directory and triggers ingestion for that file.
     """
@@ -170,7 +206,11 @@ async def upload_document(file: UploadFile = File(...)):
         files_to_process = manager.get_files_to_process()
         
         if file_path in files_to_process:
-            chunks = processor.process_file(file_path)
+            chunks = processor.process_file(
+                file_path, 
+                tenant_id=tenant_id, 
+                access_level=access_level
+            )
             if chunks:
                 vector_engine.upsert_documents(chunks, batch_size=100)
                 return {"message": f"Successfully uploaded and ingested {file.filename}", "chunks": len(chunks)}
@@ -184,7 +224,10 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
 
 @app.post("/query")
-async def query_documents(request: QueryRequest):
+async def query_documents(
+    request: QueryRequest,
+    user: UserPermissions = Depends(get_current_user)
+):
     """
     2. Executes a Query Standardization LLM call to optimize user input.
     3. Executes a Hybrid Search (Dense + Sparse BM25 + RRF) with the optimized query.
@@ -243,9 +286,11 @@ Output: 'MacBook VPN setup instructions'
         optimized_query = rewrite_response.choices[0].message.content.strip().strip("'\"")
         logger.info(f"Original query: '{request.query}' -> Optimized query: '{optimized_query}'")
 
-        # Step 2: Hybrid Search with Optimized Query
+        # Step 2: Hybrid Search with Optimized Query and RBAC
         results = retriever.search(
             query=optimized_query, 
+            tenant_id=user.tenant_id,
+            allowed_access_levels=user.allowed_access_levels,
             hybrid_top_k=request.hybrid_top_k, 
             rerank_top_k=request.rerank_top_k,
             confidence_threshold=request.confidence_threshold
