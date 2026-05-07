@@ -12,6 +12,8 @@ from document_manager import DocumentManager
 from document_processor import DocumentProcessor
 from vector_engine import VectorEngine
 from hybrid_retriever import HybridRetriever
+import os
+from openai import AsyncOpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -22,6 +24,7 @@ COLLECTION_NAME = "documents_hybrid_search"
 vector_engine: VectorEngine = None
 retriever: HybridRetriever = None
 processor: DocumentProcessor = None
+llm_client: AsyncOpenAI = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,12 +32,18 @@ async def lifespan(app: FastAPI):
     Lifespan context manager runs before the server starts and after it shuts down.
     Each uvicorn worker will initialize its own local embedding models and Qdrant clients.
     """
-    global vector_engine, retriever, processor
+    global vector_engine, retriever, processor, llm_client
     logger.info("Initializing background services (Models & Qdrant Clients)...")
     
     vector_engine = VectorEngine(collection_name=COLLECTION_NAME)
     retriever = HybridRetriever(collection_name=COLLECTION_NAME)
     processor = DocumentProcessor()
+    
+    # Initialize Groq client
+    llm_client = AsyncOpenAI(
+        api_key=os.environ.get("GROQ_API_KEY", ""),
+        base_url="https://api.groq.com/openai/v1"
+    )
     
     # Quick health check
     if not vector_engine.health_check():
@@ -177,7 +186,7 @@ async def upload_document(file: UploadFile = File(...)):
 async def query_documents(request: QueryRequest):
     """
     2. Executes a Hybrid Search (Dense + Sparse BM25 + RRF) and re-ranks with FlashRank.
-    Returns the top reranked document chunks.
+    3. Calls Groq LLM to generate a natural language response using the requested system prompt.
     """
     try:
         results = retriever.search(
@@ -186,7 +195,38 @@ async def query_documents(request: QueryRequest):
             rerank_top_k=request.rerank_top_k,
             confidence_threshold=request.confidence_threshold
         )
-        return {"query": request.query, "results": results}
+        
+        # Build [CONTEXT] block
+        context_block = ""
+        if not results or (len(results) > 0 and results[0].get("id") == "ood-response"):
+            context_block = "[SYSTEM_ERROR]"
+        else:
+            for r in results:
+                context_block += f"{r['payload'].get('content', '')}\n\n"
+        
+        system_prompt = f"""You are an enterprise knowledge assistant. You will be provided with a user query and a [CONTEXT] block retrieved from our database.
+
+CRITICAL INSTRUCTION: If the [CONTEXT] block is explicitly labeled as [SYSTEM_ERROR] or is completely empty, you MUST NOT attempt to answer the user's query from your internal knowledge.
+Instead, reply exactly with: 'I am currently experiencing a temporary connection issue with the knowledge database and cannot retrieve the necessary documents. Please try again in a few moments.' Do not mention vector databases, APIs, or system architecture.
+
+[CONTEXT]
+{context_block}
+"""
+
+        # Call Groq LLM
+        response = await llm_client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": request.query}
+            ],
+            temperature=0.0
+        )
+        
+        final_answer = response.choices[0].message.content
+        
+        # Return string in results to match what frontend expects
+        return {"query": request.query, "results": final_answer}
     except Exception as e:
         logger.error(f"Query failed: {e}")
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
