@@ -18,6 +18,7 @@ services:
       resources:
         limits:
           cpus: '0.8'
+          memory: 2G # High enough to allow usage of host swap space
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -38,3 +39,4 @@ services:
       resources:
         limits:
           cpus: '0.2'
+          memory: 512M
