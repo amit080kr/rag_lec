@@ -10,6 +10,8 @@ services:
     environment:
       # Explicitly tell the API to look for qdrant at the container name instead of localhost
       - QDRANT_HOST=qdrant
+      # Pass the Groq API key from the host environment to the container
+      - GROQ_API_KEY=${GROQ_API_KEY}
     depends_on:
       - qdrant
     deploy:

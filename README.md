@@ -59,29 +59,42 @@ A high-performance, production-ready Retrieval-Augmented Generation (RAG) system
    pip install -r requirements.txt
    ```
 
-3. **Start Qdrant**:
+3. **Configure Environment**:
+   Set your Groq API key for dataset generation and LLM tasks.
+   ```bash
+   export GROQ_API_KEY="your-groq-api-key"
+   ```
+
+4. **Start Qdrant**:
    ```bash
    docker compose up -d qdrant
    ```
 
-4. **Initialize Collection**:
+5. **Initialize Collection**:
    ```bash
    python qdrant_initializer.py
    ```
 
-5. **Run the API**:
+6. **Run the API**:
    ```bash
    python main.py
    ```
 
 ---
 
-## 🐳 Docker Deployment (EC2)
+## 🐳 Docker Deployment (Automated via GitHub Actions)
 
-1. **Build and Start**:
-   ```bash
-   docker compose up -d --build
-   ```
+To prevent hardcoding API keys, this repository uses **GitHub Actions** and **GitHub Secrets** for secure, automated deployment to AWS EC2.
+
+1. **Configure GitHub Secrets**:
+   Go to your repository **Settings > Secrets and variables > Actions** and add:
+   - `GROQ_API_KEY`: Your Groq API key
+   - `EC2_HOST`: The Public IP of your EC2 instance
+   - `EC2_USERNAME`: Usually `ubuntu`
+   - `EC2_SSH_KEY`: The raw text of your `.pem` key
+
+2. **Automated Deployment**:
+   Whenever you push to the `main` branch, GitHub Actions will automatically SSH into your EC2 instance, generate a secure, invisible `.env` file containing your `GROQ_API_KEY`, and trigger `docker compose up --build`. No keys are ever stored in the codebase!
    *The API will be available at `http://localhost:8000` (or your EC2 Public IP).*
 
 2. **Resource Management**: 

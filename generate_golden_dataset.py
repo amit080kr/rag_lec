@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from qdrant_client import QdrantClient
 from openai import OpenAI
 
@@ -7,10 +8,14 @@ from openai import OpenAI
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# To use Groq, change base_url to "https://api.groq.com/openai/v1" and provide your api_key
-# Defaulting to a local Ollama instance running llama3
-CLIENT = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-MODEL_NAME = "llama3" # Change to "llama3-8b-8192" or similar if using Groq
+# Fetch the Groq API key from the environment
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    logger.warning("GROQ_API_KEY environment variable not found. The LLM generation will fail unless set.")
+
+# Configure the OpenAI client to use the Groq endpoint
+CLIENT = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY)
+MODEL_NAME = "llama3-8b-8192" # Fast Groq model suitable for dataset generation
 
 def get_sample_chunks(collection_name: str = "documents_hybrid_search", limit: int = 10):
     """Fetches a sample of document chunks from Qdrant."""
@@ -55,7 +60,7 @@ def generate_questions_for_chunk(chunk_content: str) -> list[str]:
         return questions[:2]
         
     except Exception as e:
-        logger.error(f"Error generating questions from LLM: {e}\n(Make sure Ollama is running or configure Groq).")
+        logger.error(f"Error generating questions from LLM: {e}\n(Ensure GROQ_API_KEY is set correctly).")
         return []
 
 def main():
