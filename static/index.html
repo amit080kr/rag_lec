@@ -46,6 +46,21 @@
                 </div>
             </div>
 
+            <div class="rbac-section" style="margin-top: 1.5rem;">
+                <h2>Security Context (RBAC)</h2>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary);">Tenant ID</label>
+                    <input type="text" id="tenant-input" value="default" style="padding: 0.5rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+                    
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">Access Level</label>
+                    <select id="access-input" style="padding: 0.5rem; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white;">
+                        <option value="public">public</option>
+                        <option value="internal">internal</option>
+                        <option value="confidential">confidential</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="stats-section">
                 <div class="stat-card">
                     <span class="stat-label">Status</span>
