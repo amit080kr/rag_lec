@@ -161,6 +161,10 @@ class HybridRetriever:
                 "meta": payloads[point_id]
             })
             
+        if not candidates:
+            logger.info("No candidates found in database matching the filters. Skipping reranking.")
+            return []
+            
         logger.info(f"Hybrid Search complete. Re-ranking the top {len(candidates)} candidates...")
         
         # 5. Ultra-lightweight Re-ranking
