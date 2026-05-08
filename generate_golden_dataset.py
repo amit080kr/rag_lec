@@ -17,7 +17,7 @@ if not GROQ_API_KEY:
 CLIENT = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY)
 MODEL_NAME = "llama-3.1-8b-instant" # Fast Groq model suitable for dataset generation
 
-def get_sample_chunks(collection_name: str = "documents_hybrid_search", limit: int = 10):
+def get_sample_chunks(collection_name: str = "documents_hybrid_search", limit: int = 300):
     """Fetches a sample of document chunks from Qdrant."""
     logger.info(f"Fetching {limit} chunks from Qdrant collection: {collection_name}")
     client = QdrantClient(host=os.getenv("QDRANT_HOST", "localhost"), port=6333)
@@ -33,14 +33,19 @@ def get_sample_chunks(collection_name: str = "documents_hybrid_search", limit: i
 def generate_questions_for_chunk(chunk_content: str) -> list[str]:
     """Uses LLM to generate exactly 2 questions that this chunk perfectly answers."""
     prompt = f"""
-    You are an expert dataset creator. 
-    Read the following document chunk and generate EXACTLY TWO distinct, realistic user questions.
-    The chunk must be the perfect and definitive answer to both questions.
+    You are simulating a "lazy corporate employee" who is trying to search the company intranet.
+    Read the following document chunk and generate EXACTLY TWO distinct, realistic user search queries.
+    
+    CRITICAL RULES:
+    1. Make the questions "messy". Use synonyms instead of exact keywords from the text.
+    2. Add occasional minor typos or shorthand (e.g., "how much can i expense for dinner?" instead of "What is the reimbursement limit for dinner?").
+    3. Do not include full context. The questions should sound like they were quickly typed into a search bar.
+    4. The chunk provided must still be the factual answer to both messy queries.
     
     Document Chunk:
     {chunk_content}
     
-    Output ONLY the two questions, one per line, with no bullet points, numbers, or extra text.
+    Output ONLY the two queries, one per line, with no bullet points, numbers, or extra text.
     """
     
     try:
@@ -64,7 +69,7 @@ def generate_questions_for_chunk(chunk_content: str) -> list[str]:
         return []
 
 def main():
-    chunks = get_sample_chunks(limit=10)
+    chunks = get_sample_chunks(limit=300)
     if not chunks:
         logger.error("No chunks found in Qdrant. Please run vector_engine.py first.")
         return
@@ -78,6 +83,12 @@ def main():
             continue
             
         logger.info(f"Processing chunk {idx}/{len(chunks)} (ID: {point.id})")
+        
+        # We only want to generate questions for GOLDEN chunks to test retrieval against distractors
+        if "2024" not in str(content) and "2024" not in point.payload.get("source_file", ""):
+            # Skip distractors for question generation
+            continue
+            
         questions = generate_questions_for_chunk(content)
         
         for q in questions:
