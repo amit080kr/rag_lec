@@ -18,7 +18,7 @@ An advanced, production-ready Retrieval-Augmented Generation (RAG) system built 
 - **FinOps Semantic Cache**: Redundant queries (Cosine Similarity > 0.95) are short-circuited instantly, bypassing the DB and LLM to save cloud costs.
 - **Data Flywheel (Telemetry)**: Asynchronously logs query latency, traces, and retrieved chunks to SQLite. Supports exporting negatively-reviewed queries to JSONL for continuous fine-tuning.
 
-## 📂 Repository Structure
+## Repository Structure
 
 ```text
 rag_lec/
