@@ -86,7 +86,7 @@ To prevent malicious users from bypassing instructions (Prompt Injection) or ext
 ## Decision 7: Hardened Synthetic Evaluation
 
 ### Decision
-We rejected a naive 100% accuracy test in favor of a "Needle in a Haystack" synthetic evaluation. We populated Qdrant with 80 Golden Facts and 160 adversarial "Distractor" facts (e.g., outdated or conflicting policies) and queried them with 162 "messy", human-like queries.
+We populated Qdrant with 80 Golden Facts and 160 adversarial "Distractor" facts (e.g., outdated or conflicting policies) and queried them with 162 "messy", human-like queries.
 
 ### Consequences
 - **Performance Baseline Established:** The pipeline achieved **19.75% Recall@1** and **39.51% Recall@5** with a **0.2784 MRR**. 

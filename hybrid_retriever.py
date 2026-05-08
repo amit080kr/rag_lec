@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import List, Dict, Any, Tuple
+# pyrefly: ignore [missing-import]
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from fastembed import TextEmbedding
