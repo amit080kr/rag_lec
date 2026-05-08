@@ -43,7 +43,13 @@ def evaluate(dataset, top_k_hybrid=20, top_k_rerank=5):
         
         # Run retrieval pipeline
         # We fetch top 20 candidates, and rerank down to 5
-        results = retriever.search(query=query, hybrid_top_k=top_k_hybrid, rerank_top_k=top_k_rerank)
+        results = retriever.search(
+            query=query, 
+            tenant_id="default", 
+            allowed_access_levels=["public", "internal", "confidential"],
+            hybrid_top_k=top_k_hybrid, 
+            rerank_top_k=top_k_rerank
+        )
         
         latency_ms = (time.time() - start_time) * 1000
         total_latency_ms += latency_ms
