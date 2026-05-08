@@ -304,7 +304,7 @@ Output ONLY a valid JSON object in this exact format:
 """ + request.query
         
         firewall_response = await llm_client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[{"role": "user", "content": firewall_prompt}],
             temperature=0.0,
             response_format={"type": "json_object"}
@@ -329,7 +329,7 @@ User: 'Hey there, I forgot how to set up my VPN on my new macbook, can u help?'
 Output: 'MacBook VPN setup instructions'
 """
         rewrite_response = await llm_client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": rewrite_prompt},
                 {"role": "user", "content": request.query}
@@ -370,7 +370,7 @@ Output nothing but the raw JSON object. Do not wrap it in markdown blockquotes.
 """
 
         llm_response = await llm_client.chat.completions.create(
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": answer_prompt},
                 {"role": "user", "content": request.query}
