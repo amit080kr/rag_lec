@@ -15,12 +15,12 @@ if not GROQ_API_KEY:
 
 # Configure the OpenAI client to use the Groq endpoint
 CLIENT = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY)
-MODEL_NAME = "llama3-8b-8192" # Fast Groq model suitable for dataset generation
+MODEL_NAME = "llama-3.1-8b-instant" # Fast Groq model suitable for dataset generation
 
 def get_sample_chunks(collection_name: str = "documents_hybrid_search", limit: int = 10):
     """Fetches a sample of document chunks from Qdrant."""
     logger.info(f"Fetching {limit} chunks from Qdrant collection: {collection_name}")
-    client = QdrantClient(host="localhost", port=6333)
+    client = QdrantClient(host=os.getenv("QDRANT_HOST", "localhost"), port=6333)
     
     # We use scroll to just grab the first N records
     response, _ = client.scroll(
