@@ -140,9 +140,8 @@ def main():
     # Ah, VectorEngine in init DOES check, but we deleted it AFTER init. 
     # Let's initialize it manually.
     try:
-        from qdrant_initializer import QdrantInitializer
-        init = QdrantInitializer()
-        init.initialize_collections()
+        from qdrant_initializer import initialize_qdrant_collection
+        initialize_qdrant_collection("documents_hybrid_search")
         logger.info("Recreated collection successfully.")
     except Exception as e:
         logger.warning(f"Failed to run QdrantInitializer: {e}")
