@@ -88,7 +88,9 @@ class VectorEngine:
                     "source_file": chunk.metadata.source_file,
                     "page_number": chunk.metadata.page_number,
                     "chunk_index": chunk.metadata.chunk_index,
-                    "summary_hint": chunk.metadata.summary_hint
+                    "summary_hint": chunk.metadata.summary_hint,
+                    "tenant_id": chunk.metadata.tenant_id,
+                    "access_level": chunk.metadata.access_level
                 }
                 
                 points.append(
