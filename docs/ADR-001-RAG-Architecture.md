@@ -26,7 +26,7 @@ We chose to offload LLM processing (Security Firewall, Query Rewriting, and the 
 
 ### Consequences
 - **Positive (Latency):** Groq's specialized LPU hardware provides unparalleled inference speeds (often >800 tokens/second), reducing total user wait time to under 1-2 seconds per query.
-- **Positive (Resource Efficiency):** Removes the need for expensive, high-RAM GPU instances on AWS. We can run the entire API and Vector DB on a lightweight 1GB/2GB RAM EC2 instance (augmented with swap space).
+- **Positive (Resource Efficiency):** Removes the need for expensive, high-RAM GPU instances on AWS. We can run the API and Vector DB on a lightweight 1GB/2GB RAM EC2 instance (augmented with swap space).
 - **Negative:** Introduces a dependency on a third-party SaaS API and requires managing the `GROQ_API_KEY` securely in the production environment.
 
 ---
@@ -72,4 +72,23 @@ We integrated an asynchronous SQLite telemetry logger (`telemetry_logs`) and an 
 
 ### Consequences
 - **Positive (Continuous Improvement):** We can export negatively-reviewed queries via JSONL to continuously fine-tune our retrieval strategies.
-- **Positive (FinOps):** Redundant questions are short-circuited entirely, bypassing Qdrant and Groq, resulting in zero API costs and near-zero latency for cached hits.
+## Decision 6: Prompt Injection Security & Context Building
+
+### Decision
+To prevent malicious users from bypassing instructions (Prompt Injection) or extracting internal system prompts, we implemented a strict context-wrapping strategy in `llm_context_builder.py`.
+
+### Consequences
+- **Positive (Security):** User queries are explicitly isolated at the very bottom of the prompt (`User Query: {query}\nAnswer:`). We enforce the rule: "Answer the user's query using strictly the following context." This structure prevents the user query from acting as system instructions and overriding the behavior.
+- **Positive (Token Safety):** The context builder uses `tiktoken` to dynamically truncate context chunks that exceed the strict 4096-token limit, preventing buffer overflow attacks that attempt to break the LLM parser.
+
+---
+
+## Decision 7: Hardened Synthetic Evaluation
+
+### Decision
+We rejected a naive 100% accuracy test in favor of a "Needle in a Haystack" synthetic evaluation. We populated Qdrant with 80 Golden Facts and 160 adversarial "Distractor" facts (e.g., outdated or conflicting policies) and queried them with 162 "messy", human-like queries.
+
+### Consequences
+- **Performance Baseline Established:** The pipeline achieved **19.75% Recall@1** and **39.51% Recall@5** with a **0.2784 MRR**. 
+- **Negative (Limits Exposed):** The adversarial test exposed that our lightweight Cross-Encoder (`ms-marco-MiniLM-L-12-v2`) struggles when queries lack context and documents are highly similar. 
+- **Positive (Clear Roadmap):** This realistic benchmark proves the necessity for our next architectural upgrades: replacing the reranker with a heavier model (`bge-reranker-large`) and implementing a pre-retrieval LLM Query Rewriter.
