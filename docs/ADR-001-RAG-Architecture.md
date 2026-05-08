@@ -1,7 +1,6 @@
 # ADR-001: RAG Pipeline Core Architecture Decisions
 
 **Date:** 2026-05-08
-**Status:** Accepted
 **Context:** We are deploying an enterprise-grade Hybrid RAG application onto an AWS EC2 instance. The architecture must balance scalable performance, low latency, robust security (prompt injection & RBAC), and cost efficiency (FinOps). 
 
 This document records the foundational architectural decisions made to satisfy these production constraints.
