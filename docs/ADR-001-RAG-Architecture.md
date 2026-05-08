@@ -1,44 +1,76 @@
 # ADR-001: RAG Pipeline Core Architecture Decisions
 
-**Date:** 2026-05-07
+**Date:** 2026-05-08
 **Status:** Accepted
-**Context:** We are deploying an enterprise-grade Hybrid RAG application onto an AWS EC2 instance. We must optimize for cost (FinOps), execution latency, robust security against prompt injections, and maximal retrieval accuracy for complex corporate terminologies.
+**Context:** We are deploying an enterprise-grade Hybrid RAG application onto an AWS EC2 instance. The architecture must balance scalable performance, low latency, robust security (prompt injection & RBAC), and cost efficiency (FinOps). 
 
-This document records three foundational architectural decisions made to satisfy these constraints.
-
----
-
-## Decision 1: Local CPU Embeddings vs. External API (e.g., OpenAI)
-
-### Decision
-We chose to generate dense vectors using **FastEmbed** (`BAAI/bge-small-en-v1.5`) running entirely locally on CPU, rather than offloading to an external embedding API like `text-embedding-3-small`.
-
-### Consequences
-- **Positive (FinOps):** We eliminate recurring API costs associated with embedding queries and documents. At scale, this represents thousands of dollars saved monthly.
-- **Positive (Data Privacy):** Enterprise documents are never transmitted over the internet for vectorization, ensuring absolute data residency and compliance with strict infosec policies.
-- **Positive (Latency):** FastEmbed's ONNX runtime executes in single-digit milliseconds on CPU, removing external network round-trips.
-- **Negative:** We sacrifice a negligible margin of embedding accuracy compared to state-of-the-art closed models, but this is mitigated by our use of Hybrid Search.
+This document records the foundational architectural decisions made to satisfy these production constraints.
 
 ---
 
-## Decision 2: Reciprocal Rank Fusion (RRF) for Hybrid Search
+## Decision 1: Cloud Deployment (AWS EC2 & Docker Compose)
 
 ### Decision
-Instead of relying purely on dense semantic search, we implemented a **Hybrid Search** strategy fusing Dense Vectors with Sparse Exact-Match Text (Local BM25), combined mathematically using **Reciprocal Rank Fusion (RRF)**.
+We are using AWS EC2 instance for the cloud deployment. The entire stack (FastAPI Backend and Qdrant Vector Database) is containerized and orchestrated using `docker-compose`.
 
 ### Consequences
-- **Positive (Recall Accuracy):** Pure semantic search struggles with highly specific acronyms, employee IDs, and proprietary serial numbers. By fusing it with BM25, we ensure exact-matches are pulled to the top alongside semantically related concepts.
-- **Positive (Robustness):** RRF does not require calibrating arbitrary weight scores (e.g., 0.7 dense / 0.3 sparse). It ranks purely based on reciprocal positioning, providing an elegant, parameter-free ranking algorithm.
-- **Negative:** Retrieval time is marginally increased as Qdrant must execute two distinct search queries (vector search + payload text match) before local BM25 scoring and RRF fusion occur.
+- **Positive (Availability):** The system is now a scalable web service accessible via a public IP, rather than a local prototype.
+- **Positive (Consistency):** Docker ensures the environment (Python dependencies, ONNX runtime, Qdrant binary) behaves exactly the same in production as it did in development.
+- **Negative:** Introduces cloud infrastructure management overhead and requires secure SSH key management.
 
 ---
 
-## Decision 3: Generic Error Messages for the Security Firewall
+## Decision 2: Groq API for High-Speed LLM Inference
 
 ### Decision
-We implemented a strict LLM-based Cybersecurity Firewall that analyzes queries for prompt injection. When malicious intent is detected, we deliberately suppress the detailed LLM reasoning (e.g., *"I blocked this because it asked for my system prompt"*) and instead return a silent, generic error: `"I'm sorry, I cannot process this request."`
+We chose to offload LLM processing (Security Firewall, Query Rewriting, and the Analytical Answering Engine) to the **Groq API** using the `llama-3.1-8b-instant` model, rather than running LLMs locally.
 
 ### Consequences
-- **Positive (Security Posture):** By masking the exact reason for rejection, we prevent "Prompt Probing." Attackers cannot iteratively guess our firewall's logic or internal prompt rules based on verbose error messages.
-- **Positive (Simplicity):** Frontend systems do not need complex error-parsing logic; they simply render a polite, generic failure.
-- **Negative:** Legitimate users who accidentally trigger the firewall might be confused as to why their query failed, impacting User Experience. We accept this trade-off for the sake of enterprise security.
+- **Positive (Latency):** Groq's specialized LPU hardware provides unparalleled inference speeds (often >800 tokens/second), reducing total user wait time to under 1-2 seconds per query.
+- **Positive (Resource Efficiency):** Removes the need for expensive, high-RAM GPU instances on AWS. We can run the entire API and Vector DB on a lightweight 1GB/2GB RAM EC2 instance (augmented with swap space).
+- **Negative:** Introduces a dependency on a third-party SaaS API and requires managing the `GROQ_API_KEY` securely in the production environment.
+
+---
+
+## Decision 3: Local CPU Embeddings (FastEmbed)
+
+### Decision
+We chose to generate dense vectors using **FastEmbed** (`BAAI/bge-small-en-v1.5`) running entirely locally on the EC2 CPU, rather than offloading to an external embedding API like `text-embedding-3-small`.
+
+### Consequences
+- **Positive (FinOps):** We eliminate recurring API costs associated with embedding queries and documents.
+- **Positive (Data Privacy):** Enterprise documents are never transmitted over the internet for vectorization.
+- **Negative:** We sacrifice a negligible margin of embedding accuracy compared to state-of-the-art closed models, mitigated by our use of Hybrid Search.
+
+---
+
+## Decision 4: Reciprocal Rank Fusion (RRF) for Hybrid Search
+
+### Decision
+Instead of relying purely on dense semantic search, we implemented a **Hybrid Search** strategy fusing Dense Vectors with Sparse Exact-Match Text (Local BM25), combined mathematically using **Reciprocal Rank Fusion (RRF)**. We further refine this using a local cross-encoder (`ms-marco-MiniLM-L-12-v2` via FlashRank).
+
+### Consequences
+- **Positive (Recall Accuracy):** Pure semantic search struggles with highly specific acronyms and employee IDs. By fusing it with BM25, exact-matches are pulled to the top.
+- **Positive (Robustness):** RRF provides an elegant, parameter-free ranking algorithm.
+
+---
+
+## Decision 5: Multi-Tenancy and Strict RBAC at the Database Layer
+
+### Decision
+We implemented Multi-Tenancy and Role-Based Access Control (RBAC). Every uploaded chunk is stamped with a `tenant_id` and `access_level`. During retrieval, the FastAPI dependency injects a strict `models.Filter` payload directly into the Qdrant query.
+
+### Consequences
+- **Positive (Absolute Isolation):** By filtering at the database layer, it is mathematically impossible for the LLM to hallucinate or expose data belonging to another tenant or a restricted access level.
+- **Negative:** Requires strict metadata hygiene; any document ingested without proper tags is completely invisible to the system.
+
+---
+
+## Decision 6: Telemetry Flywheel & Semantic Caching
+
+### Decision
+We integrated an asynchronous SQLite telemetry logger (`telemetry_logs`) and an in-memory `SemanticCache` (Cosine Similarity > 0.95).
+
+### Consequences
+- **Positive (Continuous Improvement):** We can export negatively-reviewed queries via JSONL to continuously fine-tune our retrieval strategies.
+- **Positive (FinOps):** Redundant questions are short-circuited entirely, bypassing Qdrant and Groq, resulting in zero API costs and near-zero latency for cached hits.
