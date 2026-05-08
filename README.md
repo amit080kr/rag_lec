@@ -2,7 +2,7 @@
 
 An advanced, production-ready Retrieval-Augmented Generation (RAG) system built for AWS EC2. It features a 4-step agentic pipeline, strict Role-Based Access Control (RBAC) multi-tenancy, FinOps semantic caching, and a Data Flywheel telemetry system.
 
-## 🚀 Key Architecture
+## Key Architecture
 
 - **Backend Framework**: FastAPI (Python)
 - **Vector Database**: Qdrant (Dockerized)
@@ -11,35 +11,32 @@ An advanced, production-ready Retrieval-Augmented Generation (RAG) system built 
 - **Hybrid Search**: Fuses Dense Vector Search with Sparse Exact-Match Text (Local BM25) using **Reciprocal Rank Fusion (RRF)**.
 - **Reranking**: Ultra-lightweight Cross-Encoder (`ms-marco-MiniLM-L-12-v2` via FlashRank) for ultimate precision.
 
-## 🛡️ Enterprise Features
+## Enterprise Features
 
 - **Strict Multi-Tenancy (RBAC)**: All documents are tagged with `tenant_id` and `access_level`. Qdrant enforces a strict Payload Filter *before* retrieval, making it mathematically impossible for the LLM to hallucinate unauthorized data.
 - **Security Firewall**: A dedicated prompt-injection LLM intercepts every query before processing.
 - **FinOps Semantic Cache**: Redundant queries (Cosine Similarity > 0.95) are short-circuited instantly, bypassing the DB and LLM to save cloud costs.
 - **Data Flywheel (Telemetry)**: Asynchronously logs query latency, traces, and retrieved chunks to SQLite. Supports exporting negatively-reviewed queries to JSONL for continuous fine-tuning.
 
-## 🛠️ Local Development
+## 📂 Repository Structure
 
-1. Create a virtual environment and install dependencies:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. Start the Qdrant Vector Database:
-   ```bash
-   docker compose up -d qdrant
-   ```
-3. Set your Groq API Key:
-   ```bash
-   export GROQ_API_KEY="your-api-key"
-   ```
-4. Run the FastAPI Server:
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+```text
+rag_lec/
+├── main.py                     # FastAPI backend and core API endpoints
+├── hybrid_retriever.py         # RRF, FastEmbed, and FlashRank cross-encoder orchestration
+├── vector_engine.py            # Local dense vector generation and Qdrant upserting
+├── document_processor.py       # Document chunking and metadata extraction (PDF/CSV)
+├── semantic_cache.py           # FinOps caching to prevent redundant LLM/DB calls
+├── telemetry.py                # Asynchronous 'Data Flywheel' logger to SQLite
+├── llm_context_builder.py      # LLM Security Firewall and Prompt Injection protection
+├── generate_hard_corpus.py     # Evaluation: Generates needle-in-haystack Qdrant dataset
+├── generate_golden_dataset.py  # Evaluation: Generates "messy" human-like queries 
+├── evaluate_retriever.py       # Evaluation: Calculates Recall@1/5 and MRR metrics
+├── docker-compose.yml          # Production deployment orchestration
+└── docs/                       # Architecture Decision Records (ADRs)
+```
 
-## ☁️ AWS EC2 Production Deployment
+## AWS EC2 Production Deployment
 
 This project is fully automated via GitHub Actions to deploy directly to an AWS EC2 instance.
 
@@ -48,6 +45,6 @@ This project is fully automated via GitHub Actions to deploy directly to an AWS 
 3. Configure your GitHub Repository Secrets (`HOST`, `USERNAME`, `KEY`, `GROQ_API_KEY`).
 4. Push to `main`! The GitHub Action will automatically SSH into the server, pull the latest code, and restart the `docker-compose` cluster.
 
-## 📂 Documentation
+## Documentation
 
 Please see `docs/ADR-001-RAG-Architecture.md` for a comprehensive breakdown of our Engineering Architecture Decision Records.
