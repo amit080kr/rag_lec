@@ -10,10 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const queryForm = document.getElementById('query-form');
     const queryInput = document.getElementById('query-input');
     const sendButton = document.getElementById('send-button');
-    
-    // RBAC Elements
-    const tenantInput = document.getElementById('tenant-input');
-    const accessInput = document.getElementById('access-input');
 
     // --- System Status Check ---
     async function checkStatus() {
@@ -86,8 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
     async function uploadFile(file) {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('tenant_id', tenantInput.value.trim() || 'default');
-        formData.append('access_level', accessInput.value);
+        formData.append('tenant_id', 'default');
+        formData.append('access_level', 'public');
 
         // UI Update
         uploadStatus.classList.remove('hidden');
@@ -135,9 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingId = addMessage('...', 'ai', true);
 
         try {
-            const tenantId = tenantInput.value.trim() || 'default';
-            const accessLevel = accessInput.value;
-            const userToken = `${tenantId}_${accessLevel}`;
+            const userToken = `default_public`;
             
             const response = await fetch('/query', {
                 method: 'POST',
